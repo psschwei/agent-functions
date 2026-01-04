@@ -1,0 +1,1 @@
+"""CHSH inequality pattern implementation."""
