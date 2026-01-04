@@ -44,6 +44,15 @@ uv run black .             # Format code
 uv run ruff check .        # Lint code
 ```
 
+### Git Commits
+
+All commits must be signed and GPG signed:
+```bash
+git commit -sS -m "commit message"
+```
+
+The `-s` flag adds a Signed-off-by line, and `-S` GPG signs the commit.
+
 ## Architecture Overview
 
 ### Core Multi-Agent Pattern
