@@ -4,10 +4,11 @@ Classical Agent
 Executes classical workload stages (map, optimize, post-process) on Ray cluster.
 """
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 import time
 
 from executors.ray_executor import run_script_on_ray
+from patterns.decorators import PatternContext
 
 
 class ClassicalAgent:
@@ -145,3 +146,62 @@ class ClassicalAgent:
             output_path=output_path,
             **kwargs
         )
+
+    def run_decorated_stage(
+        self,
+        stage_func: Callable[[PatternContext], dict],
+        ctx: PatternContext,
+        stage_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Execute a decorated pattern stage function.
+
+        Args:
+            stage_func: The decorated stage function to execute
+            ctx: PatternContext for the stage
+            stage_name: Optional stage name (defaults to ctx.stage_name)
+
+        Returns:
+            Dictionary with execution status and results
+        """
+        stage_name = stage_name or ctx.stage_name
+
+        print(f"\n[{self.name}] Executing decorated {stage_name} stage...")
+
+        start_time = time.perf_counter()
+
+        try:
+            # Execute the decorated function
+            result = stage_func(ctx)
+
+            end_time = time.perf_counter()
+            duration = end_time - start_time
+
+            # Get output path from context
+            output_path = ctx.get_output_path()
+
+            print(f"[{self.name}] ✓ {stage_name} stage completed in {duration:.2f}s")
+
+            return {
+                "status": "success",
+                "stage": stage_name,
+                "output_path": str(output_path),
+                "duration": duration,
+                "agent": self.name,
+                "logs": ctx.get_logs(),
+            }
+
+        except Exception as e:
+            end_time = time.perf_counter()
+            duration = end_time - start_time
+
+            print(f"[{self.name}] ✗ Exception in decorated {stage_name} stage: {str(e)}")
+
+            return {
+                "status": "failed",
+                "stage": stage_name,
+                "error": str(e),
+                "duration": duration,
+                "agent": self.name,
+                "logs": ctx.get_logs(),
+            }

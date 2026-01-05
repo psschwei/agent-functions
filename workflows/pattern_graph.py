@@ -12,6 +12,8 @@ from langgraph.graph.message import add_messages
 
 from agents import ClassicalAgent, QuantumAgent
 from config import PATTERNS_DIR, CHSH_CONFIG
+from patterns.loader import PatternLoader
+from patterns.decorators import PatternContext
 
 
 class PatternState(TypedDict):
@@ -47,6 +49,7 @@ def map_stage_node(state: PatternState) -> PatternState:
     Execute the map stage using ClassicalAgent.
 
     Creates the initial circuits and observables for the pattern.
+    Supports both decorated and script-based patterns.
     """
     print("\n" + "=" * 60)
     print("MAP STAGE")
@@ -55,16 +58,30 @@ def map_stage_node(state: PatternState) -> PatternState:
     pattern_name = state["pattern_name"]
     agent = ClassicalAgent(name="ClassicalAgent-Map")
 
-    # Get script path
-    script_path = PATTERNS_DIR / pattern_name / "map.py"
-    output_path = Path(CHSH_CONFIG["map_output"])
-
     # Update state
     state["current_stage"] = "map"
     state["stage_status"]["map"] = "running"
 
-    # Execute
-    result = agent.run_map_stage(script_path, output_path)
+    # Try decorated pattern first
+    loader = PatternLoader()
+    try:
+        loader.load_pattern(pattern_name)
+        if loader.has_decorated_stage(pattern_name, "map"):
+            print(f"[Workflow] Using decorated map stage for pattern '{pattern_name}'")
+
+            # Execute decorated stage
+            ctx = PatternContext(state, "map", pattern_name)
+            stage_func = loader.get_stage_function(pattern_name, "map")
+            result = agent.run_decorated_stage(stage_func, ctx)
+        else:
+            raise ValueError("No decorated stage found")
+    except (ImportError, ValueError, KeyError):
+        # Fall back to script-based execution
+        print(f"[Workflow] Using script-based map stage for pattern '{pattern_name}'")
+
+        script_path = PATTERNS_DIR / pattern_name / "map.py"
+        output_path = Path(CHSH_CONFIG["map_output"])
+        result = agent.run_map_stage(script_path, output_path)
 
     # Update state with results
     if result["status"] == "success":
@@ -83,6 +100,7 @@ def optimize_stage_node(state: PatternState) -> PatternState:
     Execute the optimize stage using ClassicalAgent.
 
     Transpiles/optimizes circuits for the target backend.
+    Supports both decorated and script-based patterns.
     """
     print("\n" + "=" * 60)
     print("OPTIMIZE STAGE")
@@ -91,17 +109,31 @@ def optimize_stage_node(state: PatternState) -> PatternState:
     pattern_name = state["pattern_name"]
     agent = ClassicalAgent(name="ClassicalAgent-Optimize")
 
-    # Get script path
-    script_path = PATTERNS_DIR / pattern_name / "optimize.py"
-    input_path = Path(state["map_output"])
-    output_path = Path(CHSH_CONFIG["optimize_output"])
-
     # Update state
     state["current_stage"] = "optimize"
     state["stage_status"]["optimize"] = "running"
 
-    # Execute
-    result = agent.run_optimize_stage(script_path, input_path, output_path)
+    # Try decorated pattern first
+    loader = PatternLoader()
+    try:
+        loader.load_pattern(pattern_name)
+        if loader.has_decorated_stage(pattern_name, "optimize"):
+            print(f"[Workflow] Using decorated optimize stage for pattern '{pattern_name}'")
+
+            # Execute decorated stage
+            ctx = PatternContext(state, "optimize", pattern_name)
+            stage_func = loader.get_stage_function(pattern_name, "optimize")
+            result = agent.run_decorated_stage(stage_func, ctx)
+        else:
+            raise ValueError("No decorated stage found")
+    except (ImportError, ValueError, KeyError):
+        # Fall back to script-based execution
+        print(f"[Workflow] Using script-based optimize stage for pattern '{pattern_name}'")
+
+        script_path = PATTERNS_DIR / pattern_name / "optimize.py"
+        input_path = Path(state["map_output"])
+        output_path = Path(CHSH_CONFIG["optimize_output"])
+        result = agent.run_optimize_stage(script_path, input_path, output_path)
 
     # Update state with results
     if result["status"] == "success":
@@ -120,6 +152,7 @@ def execute_stage_node(state: PatternState) -> PatternState:
     Execute the quantum execution stage using QuantumAgent.
 
     Runs the circuits on the quantum simulator.
+    Supports both decorated and script-based patterns.
     """
     print("\n" + "=" * 60)
     print("EXECUTE STAGE (Quantum)")
@@ -128,17 +161,31 @@ def execute_stage_node(state: PatternState) -> PatternState:
     pattern_name = state["pattern_name"]
     agent = QuantumAgent(name="QuantumAgent-Execute")
 
-    # Get script path
-    script_path = PATTERNS_DIR / pattern_name / "execute.py"
-    input_path = Path(state["optimize_output"])
-    output_path = Path(CHSH_CONFIG["execute_output"])
-
     # Update state
     state["current_stage"] = "execute"
     state["stage_status"]["execute"] = "running"
 
-    # Execute
-    result = agent.run_execute_stage(script_path, input_path, output_path)
+    # Try decorated pattern first
+    loader = PatternLoader()
+    try:
+        loader.load_pattern(pattern_name)
+        if loader.has_decorated_stage(pattern_name, "execute"):
+            print(f"[Workflow] Using decorated execute stage for pattern '{pattern_name}'")
+
+            # Execute decorated stage
+            ctx = PatternContext(state, "execute", pattern_name)
+            stage_func = loader.get_stage_function(pattern_name, "execute")
+            result = agent.run_decorated_stage(stage_func, ctx)
+        else:
+            raise ValueError("No decorated stage found")
+    except (ImportError, ValueError, KeyError):
+        # Fall back to script-based execution
+        print(f"[Workflow] Using script-based execute stage for pattern '{pattern_name}'")
+
+        script_path = PATTERNS_DIR / pattern_name / "execute.py"
+        input_path = Path(state["optimize_output"])
+        output_path = Path(CHSH_CONFIG["execute_output"])
+        result = agent.run_execute_stage(script_path, input_path, output_path)
 
     # Update state with results
     if result["status"] == "success":
@@ -157,6 +204,7 @@ def post_process_stage_node(state: PatternState) -> PatternState:
     Execute the post-process stage using ClassicalAgent.
 
     Analyzes results and creates visualizations.
+    Supports both decorated and script-based patterns.
     """
     print("\n" + "=" * 60)
     print("POST-PROCESS STAGE")
@@ -165,20 +213,34 @@ def post_process_stage_node(state: PatternState) -> PatternState:
     pattern_name = state["pattern_name"]
     agent = ClassicalAgent(name="ClassicalAgent-PostProcess")
 
-    # Get script path
-    script_path = PATTERNS_DIR / pattern_name / "post_process.py"
-    input_path = Path(state["execute_output"])
-    output_path = Path(CHSH_CONFIG["post_process_output"])
-    summary_path = Path(CHSH_CONFIG["post_process_summary"])
-
     # Update state
     state["current_stage"] = "post_process"
     state["stage_status"]["post_process"] = "running"
 
-    # Execute
-    result = agent.run_post_process_stage(
-        script_path, input_path, output_path, summary_path
-    )
+    # Try decorated pattern first
+    loader = PatternLoader()
+    try:
+        loader.load_pattern(pattern_name)
+        if loader.has_decorated_stage(pattern_name, "post_process"):
+            print(f"[Workflow] Using decorated post_process stage for pattern '{pattern_name}'")
+
+            # Execute decorated stage
+            ctx = PatternContext(state, "post_process", pattern_name)
+            stage_func = loader.get_stage_function(pattern_name, "post_process")
+            result = agent.run_decorated_stage(stage_func, ctx)
+        else:
+            raise ValueError("No decorated stage found")
+    except (ImportError, ValueError, KeyError):
+        # Fall back to script-based execution
+        print(f"[Workflow] Using script-based post_process stage for pattern '{pattern_name}'")
+
+        script_path = PATTERNS_DIR / pattern_name / "post_process.py"
+        input_path = Path(state["execute_output"])
+        output_path = Path(CHSH_CONFIG["post_process_output"])
+        summary_path = Path(CHSH_CONFIG["post_process_summary"])
+        result = agent.run_post_process_stage(
+            script_path, input_path, output_path, summary_path
+        )
 
     # Update state with results
     if result["status"] == "success":
