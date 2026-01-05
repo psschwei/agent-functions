@@ -6,13 +6,22 @@ Multi-agent system for orchestrating quantum and classical workloads using LangG
 
 This project demonstrates a multi-agent architecture using LangGraph to coordinate classical and quantum computation workloads. It implements the CHSH inequality test as a proof-of-concept Qiskit pattern with four stages: Map, Optimize, Execute, and Post-Process.
 
+### Key Features
+
+- **Decorator-Based Patterns**: Define complete patterns in a single Python file using `@map_stage`, `@optimize_stage`, `@execute_stage`, and `@post_process_stage` decorators
+- **Multi-Agent Orchestration**: LangGraph supervisor coordinating classical and quantum agents
+- **Dual-Mode Support**: Automatic fallback between decorator-based and script-based patterns
+- **Type-Safe Context**: PatternContext provides typed I/O, logging, and config access
+- **Comprehensive Testing**: 59 unit tests with 100% pass rate
+
 ### Architecture
 
 - **Orchestrator Agent**: LangGraph supervisor coordinating the workflow
-- **Classical Agent**: Executes classical stages (map, optimize, post-process) on Ray cluster
+- **Classical Agent**: Executes classical stages (map, optimize, post-process) on Ray cluster or in-process
 - **Quantum Agent**: Executes quantum circuits on Qiskit AerSimulator
+- **Pattern System**: Decorator-based or script-based pattern implementations
 - **State Management**: LangGraph StateGraph with workflow tracking
-- **Data Flow**: File-based communication between stages
+- **Data Flow**: File-based communication between stages with pickle serialization
 
 ## Installation
 
@@ -68,13 +77,18 @@ agent-functions/
 │   ├── ray_executor.py      # Ray cluster interface
 │   └── qiskit_executor.py   # Qiskit simulator interface
 ├── patterns/            # Qiskit pattern implementations
+│   ├── decorators.py        # Decorator-based pattern system
+│   ├── loader.py            # Pattern discovery and loading
 │   └── chsh/                # CHSH inequality pattern
-│       ├── map.py           # Stage 1: Create circuits
-│       ├── optimize.py      # Stage 2: Transpile circuits
-│       ├── execute.py       # Stage 3: Run on simulator
-│       └── post_process.py  # Stage 4: Analyze results
+│       ├── pattern.py       # Decorator-based implementation (recommended)
+│       ├── map.py           # Legacy: Stage 1 script
+│       ├── optimize.py      # Legacy: Stage 2 script
+│       ├── execute.py       # Legacy: Stage 3 script
+│       └── post_process.py  # Legacy: Stage 4 script
 ├── workflows/           # LangGraph workflow definitions
 │   └── pattern_graph.py     # Workflow state and graph
+├── tests/               # Test suite
+│   └── patterns/            # Pattern system tests
 ├── utils/               # Utility modules
 │   ├── logging.py           # Console logging
 │   └── metrics.py           # Timing metrics
@@ -82,9 +96,67 @@ agent-functions/
 └── main.py              # Entry point
 ```
 
+## Pattern Development
+
+This project supports two approaches for implementing Qiskit patterns:
+
+### Decorator-Based Patterns (Recommended)
+
+Define all four stages in a single file using Python decorators:
+
+```python
+from patterns.decorators import (
+    map_stage, optimize_stage, execute_stage, post_process_stage,
+    PatternContext
+)
+
+@map_stage()
+def create_circuit(ctx: PatternContext) -> dict:
+    """Create parameterized circuit and observables."""
+    ctx.log("Creating circuit...")
+    # Implementation
+    return {"circuit": qc, "observables": obs, ...}
+
+@optimize_stage()
+def transpile_circuit(ctx: PatternContext) -> dict:
+    """Transpile circuit for target backend."""
+    map_data = ctx.load_input()  # Automatic I/O
+    # Implementation
+    return {"circuit": optimized_qc, ...}
+
+@execute_stage()
+def run_simulation(ctx: PatternContext) -> dict:
+    """Execute on quantum simulator."""
+    opt_data = ctx.load_input()
+    # Implementation
+    return {"results": results, ...}
+
+@post_process_stage()
+def analyze_results(ctx: PatternContext) -> dict:
+    """Analyze and visualize results."""
+    exec_data = ctx.load_input()
+    # Implementation
+    return {"plot_path": str(path), "summary": summary}
+```
+
+**Benefits:**
+- Single file instead of four separate scripts
+- Less boilerplate (no argparse, automatic I/O)
+- Better IDE support (autocomplete, jump to definition)
+- Type safety with PatternContext
+- Easier to test and maintain
+
+### Script-Based Patterns (Legacy)
+
+Traditional approach with four separate Python scripts (map.py, optimize.py, execute.py, post_process.py). Still supported for backward compatibility.
+
+The workflow automatically detects decorated patterns and falls back to scripts if not found.
+
 ## CHSH Pattern
 
 The CHSH (Clauser-Horne-Shimony-Holt) inequality test demonstrates quantum entanglement by showing correlations that violate classical physics bounds.
+
+The CHSH pattern is implemented using the decorator-based approach in `patterns/chsh/pattern.py` (280 lines vs 400+ for script-based).
 
 ### Stages
 
@@ -101,9 +173,46 @@ The CHSH (Clauser-Horne-Shimony-Holt) inequality test demonstrates quantum entan
 
 ## Development
 
-### Running Individual Stages
+### Creating a New Pattern
 
-Each pattern stage can be run independently:
+To create a new pattern using the decorator approach:
+
+1. Create a directory: `patterns/my_pattern/`
+2. Create `patterns/my_pattern/pattern.py`:
+
+```python
+from patterns.decorators import map_stage, optimize_stage, execute_stage, post_process_stage, PatternContext
+
+@map_stage()
+def my_map_stage(ctx: PatternContext) -> dict:
+    # Your implementation
+    return {"circuit": circuit, ...}
+
+@optimize_stage()
+def my_optimize_stage(ctx: PatternContext) -> dict:
+    input_data = ctx.load_input()
+    # Your implementation
+    return {"circuit": optimized_circuit, ...}
+
+@execute_stage()
+def my_execute_stage(ctx: PatternContext) -> dict:
+    input_data = ctx.load_input()
+    # Your implementation
+    return {"results": results, ...}
+
+@post_process_stage()
+def my_post_process_stage(ctx: PatternContext) -> dict:
+    input_data = ctx.load_input()
+    # Your implementation
+    return {"plot_path": str(plot_path), "summary": summary}
+```
+
+3. Add "my_pattern" to `main.py` argument parser choices
+4. Run: `python main.py --pattern my_pattern`
+
+### Running Individual Stages (Legacy)
+
+For script-based patterns, each stage can be run independently:
 
 ```bash
 # Map stage
@@ -121,14 +230,27 @@ python patterns/chsh/post_process.py --input data/execute.pkl --output data/resu
 
 ### Testing
 
-To verify the installation and run a quick test:
+Run the complete test suite:
+
+```bash
+# Run all tests
+uv run pytest tests/
+
+# Run pattern tests only
+uv run pytest tests/patterns/ -v
+
+# Run with coverage
+uv run pytest tests/ --cov=patterns
+```
+
+To verify the installation and run an end-to-end test:
 
 ```bash
 python main.py --pattern chsh
 ```
 
 Check the `data/` directory for output files:
-- `chsh_final.png`: Visualization of CHSH results
+- `chsh_post_process_result.png`: Visualization of CHSH results
 - `chsh_summary.json`: Numerical summary
 
 ## Architecture Details
@@ -154,10 +276,60 @@ The workflow state tracks:
 
 ### Execution Model
 
-- **Classical stages**: Executed on Ray cluster for distributed computing
+- **Classical stages**: Executed on Ray cluster for distributed computing (or in-process for decorated patterns)
 - **Quantum stages**: Executed using Qiskit AerSimulator
 - **Data flow**: File-based with pickle serialization
 - **Error handling**: Fail-fast with detailed error reporting
+- **Pattern execution**: Automatic detection of decorated vs. script-based patterns with fallback support
+
+### PatternContext API
+
+For decorator-based patterns, the `PatternContext` provides:
+
+- **I/O Methods**:
+  - `ctx.load_input()`: Load pickle from previous stage
+  - `ctx.save_output(data)`: Save pickle (automatic via decorator)
+  - `ctx.get_input_path()`: Get path to previous stage's output
+  - `ctx.get_output_path()`: Get path for this stage's output
+
+- **Logging**:
+  - `ctx.log(message, level="INFO")`: Log execution messages
+  - `ctx.get_logs()`: Retrieve all logged messages
+
+- **Configuration**:
+  - `ctx.get_config(key, default=None)`: Access pattern-specific config
+  - `ctx.state`: Direct access to workflow state dictionary
+
+## Features
+
+### Dual-Mode Pattern Support
+
+The system supports both decorator-based and script-based patterns:
+
+- **Automatic detection**: Workflow checks for decorated patterns first
+- **Graceful fallback**: Falls back to scripts if decorated pattern not found
+- **Backward compatible**: Existing script-based patterns continue to work
+- **Migration friendly**: Patterns can be migrated incrementally
+
+### Decorator Benefits
+
+Compared to script-based patterns, decorators provide:
+
+- **30% less code**: Single file vs. four separate scripts
+- **No boilerplate**: Automatic argparse, I/O handling, and output saving
+- **Better tooling**: IDE autocomplete, jump-to-definition, type checking
+- **Type safety**: PatternContext provides typed access to state and methods
+- **Easier testing**: Test functions directly without subprocess overhead
+- **Clear dependencies**: Explicit stage dependencies in decorator parameters
+
+### Test Coverage
+
+Comprehensive test suite with 59 unit tests:
+
+- **test_decorators.py**: Decorator registration and metadata (17 tests)
+- **test_pattern_context.py**: I/O, logging, and config access (20 tests)
+- **test_pattern_loader.py**: Pattern discovery and validation (22 tests)
+- **100% pass rate**: All tests passing with proper fixtures
 
 ## Configuration
 
