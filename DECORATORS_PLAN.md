@@ -101,10 +101,58 @@ def post_process_stage(ctx: PatternContext) -> dict:
 The `@pattern_stage` decorator accepts:
 
 - **stage_name** (str, required): Stage identifier ("map", "optimize", "execute", "post_process")
-- **agent_type** (str, required): "classical" or "quantum"
+- **agent_type** (str, required): "classical" or "quantum" (or stage-specific agent types - see below)
 - **dependencies** (list[str], optional): Explicit stage dependencies (default: linear pipeline)
 - **timeout** (int, optional): Execution timeout in seconds
 - **retry** (int, optional): Number of retry attempts on failure
+
+#### Alternative Agent Type Design
+
+Instead of just two agent types (`classical` and `quantum`), the system could support **stage-specific agent types** for finer-grained specialization:
+
+**Current approach (2 agent types)**:
+```python
+@pattern_stage("map", agent_type="classical")
+@pattern_stage("optimize", agent_type="classical")
+@pattern_stage("execute", agent_type="quantum")
+@pattern_stage("post_process", agent_type="classical")
+```
+
+**Enhanced approach (4+ agent types)**:
+```python
+@pattern_stage("map", agent_type="map")
+@pattern_stage("optimize", agent_type="optimize")
+@pattern_stage("execute", agent_type="execute")
+@pattern_stage("post_process", agent_type="post_process")
+```
+
+This would enable:
+- **MapAgent**: Specialized for circuit creation, parameter space definition
+- **OptimizeAgent**: Specialized for transpilation, circuit optimization, backend selection
+- **ExecuteAgent**: Specialized for quantum execution, result collection
+- **PostProcessAgent**: Specialized for analysis, visualization, metric computation
+
+**Benefits of stage-specific agents**:
+- ✅ Better separation of concerns (each agent has single responsibility)
+- ✅ Easier to extend (add new optimization strategies to OptimizeAgent only)
+- ✅ Custom resource allocation (e.g., OptimizeAgent gets more CPU, ExecuteAgent gets QPU access)
+- ✅ Independent evolution (update ExecuteAgent without touching MapAgent)
+- ✅ Better telemetry (track performance per agent type)
+
+**Trade-offs**:
+- ❌ More agent classes to maintain (4 instead of 2)
+- ❌ Higher initial complexity
+- ❌ Potential over-engineering for simple patterns
+
+**Implementation path**:
+- Phase 1: Start with 2 agent types (classical/quantum)
+- Phase 2+: Allow custom agent type strings, with fallback mapping:
+  - `agent_type="map"` → falls back to ClassicalAgent if MapAgent doesn't exist
+  - `agent_type="optimize"` → falls back to ClassicalAgent
+  - `agent_type="execute"` → falls back to QuantumAgent
+  - `agent_type="post_process"` → falls back to ClassicalAgent
+
+This preserves backward compatibility while enabling gradual migration to specialized agents.
 
 ### 2.3 PatternContext API
 
@@ -838,19 +886,31 @@ def test_decorator_execution_performance():
 
 ### 11.1 Design Decisions Needed
 
-1. **File organization**: Single `pattern.py` vs `{pattern_name}.py` in patterns/ root?
-2. **Execution mode**: In-process by default, or always subprocess for consistency?
-3. **Config approach**: Convention-based paths, or keep explicit config?
-4. **Migration timeline**: When to deprecate script-based approach?
-5. **Pattern validation**: Strict (must have all 4 stages) or flexible?
+1. **Agent type granularity**: Use 2 agent types (classical/quantum) or 4+ stage-specific agents (MapAgent, OptimizeAgent, ExecuteAgent, PostProcessAgent)? The latter provides better separation of concerns but adds complexity. See [Alternative Agent Type Design](#alternative-agent-type-design).
+
+2. **File organization**: Single `pattern.py` vs `{pattern_name}.py` in patterns/ root? Should decorated patterns live alongside scripts or in a separate directory structure?
+
+3. **Execution mode**: In-process by default, or always subprocess for consistency? In-process is faster but subprocess provides better isolation and resource cleanup.
+
+4. **Config approach**: Convention-based paths (`data/{pattern}_{stage}_result.pkl`) or keep explicit config in `settings.py`? Convention reduces boilerplate but explicit config provides more control.
+
+5. **Migration timeline**: When to deprecate script-based approach? Maintain indefinitely, or set a deprecation timeline once decorator approach is proven?
+
+6. **Pattern validation**: Strict (must have all 4 stages) or flexible (allow patterns with subset of stages)? Flexibility enables simpler patterns but may complicate orchestration logic.
 
 ### 11.2 Future Enhancements
 
-1. **Non-linear workflows**: Support branching/parallel stages
-2. **Conditional stages**: Skip stages based on runtime conditions
-3. **Stage composition**: Reuse stages across patterns
-4. **Dynamic stage generation**: Generate stages programmatically
-5. **Interactive development**: Live reload of decorated patterns
+1. **Stage-specific agent types**: Instead of just `classical` and `quantum` agents, support specialized agents for each stage type (MapAgent, OptimizeAgent, ExecuteAgent, PostProcessAgent). This enables better separation of concerns, custom resource allocation per stage, and independent evolution of agent capabilities. See [Alternative Agent Type Design](#alternative-agent-type-design) for detailed proposal.
+
+2. **Non-linear workflows**: Support branching/parallel stages beyond the current linear pipeline (map → optimize → execute → post_process). Enable DAG-based workflows where stages can run in parallel or have conditional paths.
+
+3. **Conditional stages**: Skip stages based on runtime conditions (e.g., skip optimization if circuit is already optimal, skip certain measurements based on intermediate results).
+
+4. **Stage composition**: Reuse stages across patterns. For example, multiple patterns could share the same optimization or post-processing logic while having different map/execute stages.
+
+5. **Dynamic stage generation**: Generate stages programmatically based on configuration or runtime parameters. Useful for patterns that need variable numbers of optimization passes or adaptive workflows.
+
+6. **Interactive development**: Live reload of decorated patterns during development. Watch pattern files and automatically re-register stages when code changes, enabling rapid iteration without restarting the orchestrator.
 
 ---
 
