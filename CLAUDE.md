@@ -124,7 +124,62 @@ Two executor modules abstract the execution environments:
 
 ### Pattern Implementation Structure
 
-Patterns live in `patterns/{pattern_name}/` with four stages:
+Patterns can be implemented in two ways:
+
+#### Decorator-Based Patterns (Recommended)
+
+Define all stages in a single `patterns/{pattern_name}/pattern.py` file using decorators:
+
+```python
+from patterns.decorators import map_stage, optimize_stage, execute_stage, post_process_stage, PatternContext
+
+@map_stage()
+def create_circuits(ctx: PatternContext) -> dict:
+    """Create parameterized circuits and observables."""
+    ctx.log("Creating circuits...")
+    # Implementation
+    return {"circuit": qc, "observables": obs, ...}
+
+@optimize_stage()
+def transpile_circuits(ctx: PatternContext) -> dict:
+    """Transpile circuits for target backend."""
+    map_data = ctx.load_input()  # Load from previous stage
+    # Implementation
+    return {"circuit": optimized_qc, ...}
+
+@execute_stage()
+def run_simulation(ctx: PatternContext) -> dict:
+    """Execute circuits on quantum simulator."""
+    opt_data = ctx.load_input()
+    # Implementation
+    return {"results": results, ...}
+
+@post_process_stage()
+def analyze_results(ctx: PatternContext) -> dict:
+    """Analyze results and create visualizations."""
+    exec_data = ctx.load_input()
+    # Implementation
+    return {"plot_path": str(plot_path), "summary": summary}
+```
+
+**Benefits:**
+- Single file instead of four separate scripts
+- Less boilerplate (no argparse, automatic I/O)
+- Better IDE support (jump to definition, autocomplete)
+- Type safety with PatternContext
+- Automatic output saving
+
+**PatternContext API:**
+- `ctx.load_input()`: Load pickle from previous stage
+- `ctx.save_output(data)`: Save pickle (automatic via decorator)
+- `ctx.get_input_path()`: Get path to previous stage's output
+- `ctx.get_output_path()`: Get path for this stage's output
+- `ctx.log(message, level)`: Log message to orchestrator
+- `ctx.get_config(key)`: Access pattern-specific config
+
+#### Script-Based Patterns (Legacy)
+
+Patterns live in `patterns/{pattern_name}/` with four separate scripts:
 
 1. **map.py**: Creates parameterized circuits and observables
    - Takes: command-line args for output path
@@ -144,6 +199,8 @@ Patterns live in `patterns/{pattern_name}/` with four stages:
 
 Each script is **standalone** with argparse CLI and can be run independently.
 
+**Note:** The workflow automatically detects and uses decorated patterns when available, falling back to scripts if not found.
+
 ### Configuration System
 
 All settings are centralized in `config/settings.py`:
@@ -156,7 +213,43 @@ Import from config module: `from config import PATTERNS_DIR, CHSH_CONFIG`
 
 ## Adding New Patterns
 
-To add a new pattern (e.g., "vqe"):
+### Decorator-Based Pattern (Recommended)
+
+To add a new pattern (e.g., "vqe") using decorators:
+
+1. Create `patterns/vqe/` directory
+2. Create `patterns/vqe/pattern.py` with decorated stage functions:
+   ```python
+   from patterns.decorators import map_stage, optimize_stage, execute_stage, post_process_stage, PatternContext
+
+   @map_stage()
+   def create_vqe_circuit(ctx: PatternContext) -> dict:
+       # Implementation
+       return {"circuit": qc, ...}
+
+   @optimize_stage()
+   def optimize_vqe(ctx: PatternContext) -> dict:
+       # Implementation
+       return {"circuit": optimized_qc, ...}
+
+   @execute_stage()
+   def run_vqe(ctx: PatternContext) -> dict:
+       # Implementation
+       return {"results": results, ...}
+
+   @post_process_stage()
+   def analyze_vqe(ctx: PatternContext) -> dict:
+       # Implementation
+       return {"plot_path": str(plot_path), "summary": summary}
+   ```
+3. Update `main.py` argument parser to include "vqe" in pattern choices
+4. Run with `python main.py --pattern vqe`
+
+**Note:** No need to modify `config/settings.py` or `workflows/pattern_graph.py` - the workflow automatically discovers and executes decorated patterns using convention-based file paths (`data/{pattern}_{stage}_result.pkl`).
+
+### Script-Based Pattern (Legacy)
+
+To add a new pattern using scripts:
 
 1. Create `patterns/vqe/` directory with four stage scripts (map.py, optimize.py, execute.py, post_process.py)
 2. Add `VQE_CONFIG` to `config/settings.py` with file paths
