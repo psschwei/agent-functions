@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Repository
+
+- **GitHub Organization**: psschwei
+- **Repository Name**: agent-functions
+- **URL**: https://github.com/psschwei/agent-functions
+
 ## Project Overview
 
 This is a multi-agent system using LangGraph to orchestrate classical and quantum workloads for Qiskit patterns. The CHSH inequality test serves as the proof-of-concept implementation.
