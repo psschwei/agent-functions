@@ -41,6 +41,12 @@ ORCHESTRATOR_CONFIG = {
     "fallback_on_error": True,  # Use defaults if LLM fails
     "max_tool_calls": 10,  # Prevent infinite loops
     "decision_log_path": DATA_DIR / "orchestrator_decisions.jsonl",
+    # Phase 3: Feedback loops and iteration
+    "enable_retries": True,  # Allow stage retries on poor results
+    "enable_iteration": True,  # Allow multi-iteration optimization
+    "max_stage_retries": 2,  # Maximum retries per stage
+    "max_workflow_iterations": 3,  # Maximum workflow iterations
+    "retry_on_quality_threshold": True,  # Retry if quality below threshold
 }
 
 # Pattern-specific settings

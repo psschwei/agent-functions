@@ -39,8 +39,8 @@ class Orchestrator:
         # Create workflow
         self.workflow = create_pattern_workflow()
 
-        # Create initial state
-        self.state = create_initial_state(self.pattern_name)
+        # Create initial state (LLM disabled for basic orchestrator)
+        self.state = create_initial_state(self.pattern_name, enable_llm=False)
 
         print("✓ Workflow initialized")
         print(f"  Stages: {list(self.state['stage_status'].keys())}")

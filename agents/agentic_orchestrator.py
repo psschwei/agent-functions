@@ -12,7 +12,7 @@ from agents.orchestrator import Orchestrator
 from agents.llm_client import LLMClient
 from agents.tools import TOOL_FUNCTIONS, TOOL_DEFINITIONS
 from config import LLM_CONFIG, ORCHESTRATOR_CONFIG, DATA_DIR
-from workflows.pattern_graph import PatternState
+from workflows.pattern_graph import PatternState, create_pattern_workflow, create_initial_state
 
 ORCHESTRATOR_SYSTEM_PROMPT = """You are an expert quantum computing orchestrator coordinating the execution of Qiskit patterns.
 
@@ -91,6 +91,25 @@ class AgenticOrchestrator(Orchestrator):
         self.decision_log = []
         self.decision_log_path = ORCHESTRATOR_CONFIG.get("decision_log_path")
         self.total_tokens = 0
+
+    def initialize_workflow(self):
+        """Initialize the LangGraph workflow with LLM-enabled state."""
+        print("\n" + "=" * 60)
+        print("AGENTIC ORCHESTRATOR: Initializing Workflow")
+        print("=" * 60)
+        print(f"Pattern: {self.pattern_name}")
+        print(f"LLM Enabled: {self.enable_llm}")
+
+        # Create workflow
+        self.workflow = create_pattern_workflow()
+
+        # Create initial state with LLM enabled
+        self.state = create_initial_state(self.pattern_name, enable_llm=self.enable_llm)
+
+        print("✓ Workflow initialized")
+        print(f"  Stages: {list(self.state['stage_status'].keys())}")
+        if self.enable_llm:
+            print(f"  LLM Model: {self.llm_client.model if self.llm_client else 'N/A'}")
 
     def reason_before_stage(
         self,
@@ -385,3 +404,140 @@ Then decide: should we proceed to the next stage, or retry this stage with diffe
         """Track token usage for cost monitoring."""
         self.total_tokens += usage["total_tokens"]
         print(f"[Orchestrator] 📊 Tokens: {usage['total_tokens']} (total: {self.total_tokens})")
+
+    def reflect_on_workflow(self, state: PatternState) -> Dict[str, Any]:
+        """
+        Reflect on the complete workflow and decide whether to iterate.
+
+        Phase 3: Analyzes the entire workflow execution and determines if
+        another iteration with different parameters would improve results.
+
+        Args:
+            state: Complete workflow state after all stages
+
+        Returns:
+            Dictionary with reflection analysis and iteration decision:
+            - should_iterate: bool - whether to run another iteration
+            - reasoning: str - explanation of the decision
+            - recommended_changes: dict - suggested parameter changes
+        """
+        if not self.enable_llm:
+            return self._fallback_reflection(state)
+
+        print(f"\n[Orchestrator] 🤔 Reflecting on complete workflow...")
+
+        # Extract key results from state
+        iteration = state.get("workflow_iteration", 1)
+        timings = state.get("stage_timings", {})
+        errors = state.get("errors", [])
+        total_duration = sum(timings.values())
+
+        # Try to extract CHSH-specific results (pattern-specific)
+        chsh_violation = None
+        max_chsh_value = None
+        try:
+            import pickle
+            from pathlib import Path
+            post_process_output = state.get("post_process_output")
+            if post_process_output:
+                # Try to load summary
+                data_path = Path(post_process_output).parent / f"{state['pattern_name']}_post_process_result.pkl"
+                if data_path.exists():
+                    with open(data_path, 'rb') as f:
+                        data = pickle.load(f)
+                        if "summary" in data:
+                            max_chsh_value = data["summary"].get("max_chsh_value")
+                            chsh_violation = data["summary"].get("violation_detected")
+        except Exception as e:
+            print(f"[Orchestrator] ⚠️  Could not load results: {e}")
+
+        # Build reflection prompt
+        user_prompt = f"""The complete workflow for pattern '{state['pattern_name']}' has finished.
+
+Workflow Summary (Iteration {iteration}):
+- Total execution time: {total_duration:.2f}s
+- Stage timings: {timings}
+- Errors encountered: {len(errors)}
+- CHSH violation detected: {chsh_violation}
+- Maximum CHSH value: {max_chsh_value}
+
+Previous iterations: {len(state.get('iteration_history', []))}
+
+Questions:
+1. Should I run another iteration with different parameters?
+2. What parameter changes would improve results?
+3. Is the current result satisfactory, or can we do better?
+
+For CHSH pattern:
+- Target: Maximize CHSH violation (ideally ~2.828)
+- Classical bound: 2.0
+- Quantum bound: 2.828
+
+Provide your reflection as JSON with fields:
+- should_iterate: true/false
+- reasoning: explanation of decision
+- recommended_changes: {{stage: {{param: new_value}}}} (empty if not iterating)
+- confidence: low/medium/high
+"""
+
+        messages = [
+            {"role": "system", "content": ORCHESTRATOR_SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt}
+        ]
+
+        try:
+            response = self.llm_client.chat_completion(messages, tools=None)
+            self._track_usage(response["usage"])
+
+            content = response["content"]
+            if content:
+                # Try to parse JSON from response
+                import json
+                import re
+                json_match = re.search(r'\{[^}]+\}', content, re.DOTALL)
+                if json_match:
+                    reflection = json.loads(json_match.group())
+                    print(f"[Orchestrator] 💭 Reflection: {reflection.get('reasoning', 'N/A')}")
+                    print(f"[Orchestrator] 🎯 Confidence: {reflection.get('confidence', 'N/A')}")
+
+                    self._log_decision(
+                        decision_type="workflow_reflection",
+                        stage_name="complete_workflow",
+                        decision=f"Iterate: {reflection.get('should_iterate', False)}",
+                        reasoning=reflection.get("reasoning", ""),
+                        parameters=reflection.get("recommended_changes", {}),
+                        usage=response["usage"],
+                    )
+
+                    return reflection
+
+            # If parsing failed, don't iterate
+            return {
+                "should_iterate": False,
+                "reasoning": "Could not parse LLM response",
+                "recommended_changes": {},
+                "confidence": "low"
+            }
+
+        except Exception as e:
+            print(f"[Orchestrator] ❌ Reflection failed: {e}")
+            return self._fallback_reflection(state)
+
+    def _fallback_reflection(self, state: PatternState) -> Dict[str, Any]:
+        """
+        Fallback reflection when LLM is disabled or fails.
+
+        Simple heuristic: don't iterate unless results are clearly poor.
+        """
+        print(f"[Orchestrator] 💭 Using fallback reflection (LLM disabled)")
+
+        # Simple heuristic: check if there were errors
+        errors = state.get("errors", [])
+        has_errors = len(errors) > 0
+
+        return {
+            "should_iterate": has_errors,
+            "reasoning": "Errors detected - retry recommended" if has_errors else "No issues detected - workflow complete",
+            "recommended_changes": {},
+            "confidence": "low"
+        }
