@@ -255,9 +255,112 @@ def post_process_stage_node(state: PatternState) -> PatternState:
     return state
 
 
+def decision_before_optimize(state: PatternState) -> PatternState:
+    """
+    Decision node: Should we proceed to optimize stage?
+
+    Orchestrator analyzes map results and decides optimization strategy.
+    """
+    print("\n" + "=" * 60)
+    print("DECISION: Analyzing Map Results")
+    print("=" * 60)
+
+    # Import here to avoid circular dependency
+    from agents.agentic_orchestrator import AgenticOrchestrator
+
+    orchestrator = AgenticOrchestrator(pattern_name=state["pattern_name"])
+
+    # Reason about optimize stage parameters
+    decision = orchestrator.reason_after_stage(
+        stage_name="map",
+        state=state,
+        result={"status": "success", "output_path": state["map_output"]},
+    )
+
+    # If LLM recommends retry, mark in state (though Phase 1 doesn't implement retry yet)
+    if decision.get("should_retry"):
+        state["errors"].append(f"Map stage evaluation suggests retry: {decision.get('reasoning')}")
+
+    # Get parameters for optimize stage
+    params = orchestrator.reason_before_stage("optimize", state)
+
+    # Store recommended parameters in state for optimize node to use
+    if "_llm_recommended_params" not in state:
+        state["_llm_recommended_params"] = {}
+    state["_llm_recommended_params"] = params.get("parameters", {})
+    state["messages"].append({
+        "role": "assistant",
+        "content": f"Optimize stage parameters: {params.get('reasoning')}",
+    })
+
+    return state
+
+
+def decision_before_execute(state: PatternState) -> PatternState:
+    """Decision node before execute stage."""
+    print("\n" + "=" * 60)
+    print("DECISION: Analyzing Optimize Results")
+    print("=" * 60)
+
+    from agents.agentic_orchestrator import AgenticOrchestrator
+
+    orchestrator = AgenticOrchestrator(pattern_name=state["pattern_name"])
+
+    # Evaluate optimize results
+    decision = orchestrator.reason_after_stage(
+        stage_name="optimize",
+        state=state,
+        result={"status": "success", "output_path": state["optimize_output"]},
+    )
+
+    # Get execute parameters
+    params = orchestrator.reason_before_stage("execute", state)
+    if "_llm_recommended_params" not in state:
+        state["_llm_recommended_params"] = {}
+    state["_llm_recommended_params"] = params.get("parameters", {})
+    state["messages"].append({
+        "role": "assistant",
+        "content": f"Execute stage parameters: {params.get('reasoning')}",
+    })
+
+    return state
+
+
+def decision_before_post_process(state: PatternState) -> PatternState:
+    """Decision node before post-process stage."""
+    print("\n" + "=" * 60)
+    print("DECISION: Analyzing Execute Results")
+    print("=" * 60)
+
+    from agents.agentic_orchestrator import AgenticOrchestrator
+
+    orchestrator = AgenticOrchestrator(pattern_name=state["pattern_name"])
+
+    # Evaluate execute results
+    decision = orchestrator.reason_after_stage(
+        stage_name="execute",
+        state=state,
+        result={"status": "success", "output_path": state["execute_output"]},
+    )
+
+    # Get post-process parameters
+    params = orchestrator.reason_before_stage("post_process", state)
+    if "_llm_recommended_params" not in state:
+        state["_llm_recommended_params"] = {}
+    state["_llm_recommended_params"] = params.get("parameters", {})
+    state["messages"].append({
+        "role": "assistant",
+        "content": f"Post-process stage parameters: {params.get('reasoning')}",
+    })
+
+    return state
+
+
 def create_pattern_workflow() -> StateGraph:
     """
     Create the LangGraph workflow for pattern execution.
+
+    Now includes decision nodes between stages for LLM reasoning.
 
     Returns:
         Compiled StateGraph workflow
@@ -267,15 +370,21 @@ def create_pattern_workflow() -> StateGraph:
 
     # Add nodes for each stage
     workflow.add_node("map_stage", map_stage_node)
+    workflow.add_node("decision_before_optimize", decision_before_optimize)
     workflow.add_node("optimize_stage", optimize_stage_node)
+    workflow.add_node("decision_before_execute", decision_before_execute)
     workflow.add_node("execute_stage", execute_stage_node)
+    workflow.add_node("decision_before_post_process", decision_before_post_process)
     workflow.add_node("post_process_stage", post_process_stage_node)
 
-    # Define workflow edges (linear pipeline)
+    # Define workflow edges with decision nodes
     workflow.add_edge(START, "map_stage")
-    workflow.add_edge("map_stage", "optimize_stage")
-    workflow.add_edge("optimize_stage", "execute_stage")
-    workflow.add_edge("execute_stage", "post_process_stage")
+    workflow.add_edge("map_stage", "decision_before_optimize")
+    workflow.add_edge("decision_before_optimize", "optimize_stage")
+    workflow.add_edge("optimize_stage", "decision_before_execute")
+    workflow.add_edge("decision_before_execute", "execute_stage")
+    workflow.add_edge("execute_stage", "decision_before_post_process")
+    workflow.add_edge("decision_before_post_process", "post_process_stage")
     workflow.add_edge("post_process_stage", END)
 
     # Compile the workflow

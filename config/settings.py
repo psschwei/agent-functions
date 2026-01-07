@@ -23,6 +23,26 @@ QISKIT_CONFIG = {
     "seed_simulator": 42,
 }
 
+# LLM configuration for orchestrator
+LLM_CONFIG = {
+    "model": "gpt-4",  # Model name for OpenAI-compatible endpoint
+    "base_url": None,  # Set to litellm proxy URL, e.g., "http://localhost:4000"
+    "api_key": None,  # Falls back to OPENAI_API_KEY env var
+    "temperature": 0.7,
+    "max_tokens": 2000,
+    "timeout": 30,  # Request timeout in seconds
+    "max_retries": 3,
+}
+
+# Orchestrator reasoning configuration
+ORCHESTRATOR_CONFIG = {
+    "enable_llm": False,  # Feature flag for LLM reasoning
+    "enable_logging": True,  # Log all LLM decisions
+    "fallback_on_error": True,  # Use defaults if LLM fails
+    "max_tool_calls": 10,  # Prevent infinite loops
+    "decision_log_path": DATA_DIR / "orchestrator_decisions.jsonl",
+}
+
 # Pattern-specific settings
 CHSH_CONFIG = {
     "map_output": DATA_DIR / "chsh_map_result.pkl",

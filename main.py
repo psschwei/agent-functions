@@ -9,7 +9,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from agents import Orchestrator
+from agents import Orchestrator, AgenticOrchestrator
 from executors import init_ray_cluster, shutdown_ray_cluster
 from utils import print_banner, print_section, format_duration
 
@@ -57,6 +57,12 @@ Examples:
         "--no-ray",
         action="store_true",
         help="Skip Ray cluster initialization (for debugging)"
+    )
+
+    parser.add_argument(
+        "--agentic",
+        action="store_true",
+        help="Use agentic orchestrator with LLM reasoning (default: basic orchestrator)"
     )
 
     return parser.parse_args()
@@ -155,9 +161,15 @@ def main():
 
     try:
         # Create orchestrator
-        print_section(f"Creating Orchestrator for '{args.pattern}' Pattern")
-        orchestrator = Orchestrator(pattern_name=args.pattern)
-        print("  Orchestrator created")
+        orchestrator_type = "Agentic" if args.agentic else "Basic"
+        print_section(f"Creating {orchestrator_type} Orchestrator for '{args.pattern}' Pattern")
+
+        if args.agentic:
+            orchestrator = AgenticOrchestrator(pattern_name=args.pattern)
+        else:
+            orchestrator = Orchestrator(pattern_name=args.pattern)
+
+        print(f"  {orchestrator_type} Orchestrator created")
 
         # Display workflow visualization if requested
         if args.visualize:

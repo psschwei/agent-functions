@@ -8,6 +8,7 @@ dependencies = [
     "langgraph>=0.2.0",
     "langchain>=0.3.0",
     "langchain-anthropic>=0.2.0",
+    "openai>=1.0.0",
     "qiskit>=1.0.0",
     "qiskit-aer>=0.14.0",
     "ray>=2.9.0",
