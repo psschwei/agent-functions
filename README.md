@@ -10,14 +10,16 @@ This project demonstrates a multi-agent architecture using LangGraph to coordina
 
 - **Decorator-Based Patterns**: Define complete patterns in a single Python file using `@map_stage`, `@optimize_stage`, `@execute_stage`, and `@post_process_stage` decorators
 - **Multi-Agent Orchestration**: LangGraph supervisor coordinating classical and quantum agents
+- **Agentic Mode**: LLM-powered orchestrator with autonomous decision-making (`--agentic` flag)
+- **Mellea Integration**: Adaptive execution with LLM-based result evaluation and parameter optimization
 - **Dual-Mode Support**: Automatic fallback between decorator-based and script-based patterns
 - **Type-Safe Context**: PatternContext provides typed I/O, logging, and config access
-- **Comprehensive Testing**: 59 unit tests with 100% pass rate
 
 ### Architecture
 
-- **Orchestrator Agent**: LangGraph supervisor coordinating the workflow
+- **Orchestrator Agent**: LangGraph supervisor coordinating the workflow (basic or agentic)
 - **Classical Agent**: Executes classical stages (map, optimize, post-process) on Ray cluster or in-process
+- **Mellea Classical Agent**: Enhanced classical agent with adaptive execution and LLM-based evaluation
 - **Quantum Agent**: Executes quantum circuits on Qiskit AerSimulator
 - **Pattern System**: Decorator-based or script-based pattern implementations
 - **State Management**: LangGraph StateGraph with workflow tracking
@@ -61,6 +63,9 @@ python main.py --pattern chsh --save-diagram workflow.md
 
 # Run without Ray cluster (for debugging)
 python main.py --pattern chsh --no-ray
+
+# Use agentic orchestrator with LLM reasoning
+python main.py --pattern chsh --agentic
 ```
 
 ## Project Structure
@@ -68,9 +73,17 @@ python main.py --pattern chsh --no-ray
 ```
 agent-functions/
 ├── agents/              # Agent implementations
-│   ├── classical_agent.py   # Classical workload executor
-│   ├── quantum_agent.py     # Quantum workload executor
-│   └── orchestrator.py      # Main LangGraph supervisor
+│   ├── classical_agent.py       # Classical workload executor
+│   ├── quantum_agent.py         # Quantum workload executor
+│   ├── orchestrator.py          # Basic LangGraph supervisor
+│   ├── agentic_orchestrator.py  # LLM-powered orchestrator
+│   ├── llm_client.py            # LLM client wrapper
+│   ├── mellea_classical_agent.py  # Adaptive classical agent
+│   └── tools/                   # LLM tools for agentic orchestrator
+│       ├── circuit_analysis.py      # Circuit complexity analysis
+│       ├── stage_evaluation.py      # Stage result evaluation
+│       ├── parameter_recommendation.py  # Parameter suggestions
+│       └── data_loader.py           # Intermediate data access
 ├── config/              # Configuration settings
 │   └── settings.py
 ├── executors/           # Execution backends
@@ -282,6 +295,67 @@ The workflow state tracks:
 - **Error handling**: Fail-fast with detailed error reporting
 - **Pattern execution**: Automatic detection of decorated vs. script-based patterns with fallback support
 
+### Agentic Orchestrator
+
+The `--agentic` flag enables an LLM-powered orchestrator that provides autonomous decision-making:
+
+```bash
+python main.py --pattern chsh --agentic
+```
+
+**Capabilities:**
+- **Circuit Analysis**: Recommends optimization strategies based on circuit complexity
+- **Result Evaluation**: Assesses stage output quality and completeness
+- **Parameter Recommendations**: Suggests optimal parameters for upcoming stages
+- **Retry Decisions**: Determines when to retry failed or suboptimal stages
+- **Workflow Control**: Decides when to terminate vs. iterate the workflow
+
+**Available Tools:**
+- `analyze_circuit_complexity()` - Analyze quantum circuit to recommend optimization strategies
+- `evaluate_stage_results()` - Assess quality of stage output
+- `recommend_parameters()` - Suggest parameter values for stages
+- `load_intermediate_results()` - Access intermediate data for analysis
+
+**Configuration** (in `config/settings.py`):
+```python
+LLM_CONFIG = {
+    "model": "gpt-4",  # Model name for OpenAI-compatible endpoint
+    "base_url": None,  # Set to litellm proxy URL
+    "temperature": 0.7,
+    "max_tokens": 2000,
+}
+
+ORCHESTRATOR_CONFIG = {
+    "enable_llm": False,  # Enable LLM reasoning
+    "enable_retries": True,  # Allow stage retries on poor results
+    "max_stage_retries": 2,  # Maximum retries per stage
+    "max_workflow_iterations": 3,  # Maximum workflow iterations
+}
+```
+
+### Mellea Integration
+
+Mellea provides adaptive execution with LLM-based result evaluation and parameter optimization:
+
+**Features:**
+- **Multiple Backends**: ollama, watsonx, huggingface, openai
+- **Result Quality Evaluation**: LLM-based assessment of stage outputs
+- **Adaptive Parameter Adjustment**: Automatic suggestions for improving results
+- **Retry Logic**: Up to N adaptive retries with LLM-guided improvements
+- **Graceful Fallback**: Automatic fallback to standard agent if Mellea unavailable
+
+**Configuration** (in `config/settings.py`):
+```python
+MELLEA_CONFIG = {
+    "enabled": False,  # Feature flag
+    "model_backend": "ollama",  # Backend: ollama, watsonx, huggingface, openai
+    "max_retries": 2,  # Maximum adaptive retries per stage
+    "stages": ["map"],  # Which stages to use Mellea for
+    "evaluation_enabled": True,  # Enable result quality evaluation
+    "adjustment_enabled": True,  # Enable parameter adjustment suggestions
+}
+```
+
 ### PatternContext API
 
 For decorator-based patterns, the `PatternContext` provides:
@@ -334,10 +408,14 @@ Comprehensive test suite with 59 unit tests:
 ## Configuration
 
 Edit `config/settings.py` to customize:
-- Ray cluster settings (CPU count, etc.)
-- Qiskit simulation parameters (shots, seed)
-- File paths for outputs
-- Logging configuration
+
+- **RAY_CONFIG**: Ray cluster settings (CPU count, dashboard)
+- **QISKIT_CONFIG**: Simulation parameters (shots, seed)
+- **LLM_CONFIG**: LLM settings for agentic orchestrator (model, endpoint, temperature)
+- **ORCHESTRATOR_CONFIG**: Workflow settings (retries, iterations, quality thresholds)
+- **MELLEA_CONFIG**: Adaptive agent settings (backend, stages, evaluation)
+- **CHSH_CONFIG**: Pattern-specific file paths
+- **LANGGRAPH_CONFIG**: Workflow checkpointing and recursion limits
 
 ## License
 
