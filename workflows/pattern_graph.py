@@ -53,17 +53,40 @@ class PatternState(TypedDict):
 
 def map_stage_node(state: PatternState) -> PatternState:
     """
-    Execute the map stage using ClassicalAgent.
+    Execute the map stage using ClassicalAgent or MelleaClassicalAgent.
 
     Creates the initial circuits and observables for the pattern.
     Supports both decorated and script-based patterns.
+    Can use Mellea for adaptive execution if enabled in config.
     """
     print("\n" + "=" * 60)
     print("MAP STAGE")
     print("=" * 60)
 
     pattern_name = state["pattern_name"]
-    agent = ClassicalAgent(name="ClassicalAgent-Map")
+    
+    # Check if Mellea is enabled for map stage
+    from config import MELLEA_CONFIG
+    use_mellea = (
+        MELLEA_CONFIG.get("enabled", False) and 
+        "map" in MELLEA_CONFIG.get("stages", [])
+    )
+    
+    if use_mellea:
+        try:
+            from agents.mellea_classical_agent import MelleaClassicalAgent
+            agent = MelleaClassicalAgent(
+                name="MelleaClassicalAgent-Map",
+                model_backend=MELLEA_CONFIG.get("model_backend", "ollama"),
+                max_retries=MELLEA_CONFIG.get("max_retries", 2)
+            )
+            print(f"[Workflow] Using Mellea-enhanced agent for map stage")
+        except ImportError as e:
+            print(f"[Workflow] Warning: Could not load MelleaClassicalAgent: {e}")
+            print(f"[Workflow] Falling back to standard ClassicalAgent")
+            agent = ClassicalAgent(name="ClassicalAgent-Map")
+    else:
+        agent = ClassicalAgent(name="ClassicalAgent-Map")
 
     # Update state
     state["current_stage"] = "map"
