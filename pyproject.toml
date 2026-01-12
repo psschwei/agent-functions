@@ -14,6 +14,7 @@ dependencies = [
     "ray>=2.9.0",
     "numpy>=1.24.0",
     "matplotlib>=3.7.0",
+    "mellea>=0.1.0",
 ]
 
 [build-system]

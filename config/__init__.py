@@ -10,6 +10,7 @@ from .settings import (
     CHSH_CONFIG,
     LANGGRAPH_CONFIG,
     LOGGING_CONFIG,
+    MELLEA_CONFIG,
 )
 
 __all__ = [
@@ -23,4 +24,5 @@ __all__ = [
     "CHSH_CONFIG",
     "LANGGRAPH_CONFIG",
     "LOGGING_CONFIG",
+    "MELLEA_CONFIG",
 ]
