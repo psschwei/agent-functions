@@ -208,3 +208,6 @@ __marimo__/
 
 # Application-specific
 data/
+
+# bv (beads viewer) local config and caches
+.bv/
