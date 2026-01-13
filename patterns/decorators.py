@@ -474,6 +474,10 @@ def _create_stage_decorator(
             decorated_func._pattern_metadata = metadata
             decorated_func._pattern_name = pattern_name
 
+            # Update metadata to point to the decorated function (with auto-save)
+            # so that loader.get_stage_function() returns the wrapper
+            metadata.func = decorated_func
+
             return decorated_func
 
         # Support both @decorator and @decorator() syntax
