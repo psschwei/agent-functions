@@ -189,7 +189,7 @@ def main():
         print_section(f"Creating {orchestrator_type} Orchestrator for '{args.pattern}' Pattern")
 
         if args.agentic:
-            orchestrator = AgenticOrchestrator(pattern_name=args.pattern)
+            orchestrator = AgenticOrchestrator(pattern_name=args.pattern, enable_llm=True)
         else:
             orchestrator = Orchestrator(pattern_name=args.pattern)
 
