@@ -7,14 +7,20 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Callable
 import time
 import json
+import re
 
 try:
     import mellea
-    from mellea import generative, req
-    from mellea.strategies import RejectionSamplingStrategy
+    from mellea import MelleaSession, generative
+    from mellea.stdlib.requirement import req
+    from mellea.stdlib.sampling import RejectionSamplingStrategy
+    # Import backends
+    from mellea.backends.ollama import OllamaModelBackend
     MELLEA_AVAILABLE = True
 except ImportError:
     MELLEA_AVAILABLE = False
+    MelleaSession = None
+    OllamaModelBackend = None
     print("Warning: Mellea not installed. MelleaClassicalAgent will not be available.")
 
 from agents.classical_agent import ClassicalAgent
@@ -32,32 +38,79 @@ class MelleaClassicalAgent(ClassicalAgent):
     - Quality validation with constraints
     """
 
-    def __init__(self, name: str = "MelleaClassicalAgent", model_backend: str = "ollama", max_retries: int = 2):
+    def __init__(self, name: str = "MelleaClassicalAgent", model_backend: str = "ollama", model_name: str = "llama2", max_retries: int = 2):
         """
         Initialize the Mellea-enhanced classical agent.
 
         Args:
             name: Agent name for logging
             model_backend: Mellea backend to use (ollama, watsonx, huggingface, etc.)
+            model_name: Model name/ID for the backend (e.g., "llama2", "mistral")
             max_retries: Maximum number of adaptive retries per stage
         """
         if not MELLEA_AVAILABLE:
             raise ImportError(
                 "Mellea is not installed. Install it with: pip install mellea"
             )
-        
+
         super().__init__(name)
         self.max_retries = max_retries
         self.model_backend = model_backend
-        
-        # Initialize Mellea session
+        self.model_name = model_name
+
+        # Initialize Mellea session with appropriate backend
         try:
-            self.session = mellea.start_session(backend=model_backend)
-            print(f"[{self.name}] Initialized Mellea session with {model_backend} backend")
+            if model_backend == "ollama":
+                backend = OllamaModelBackend(model_id=model_name)
+                self.session = MelleaSession(backend=backend)
+            else:
+                # For other backends, use default session as fallback
+                self.session = mellea.start_session()
+            print(f"[{self.name}] Initialized Mellea session with {model_backend} backend (model: {model_name})")
         except Exception as e:
             print(f"[{self.name}] Warning: Failed to initialize Mellea session: {e}")
             print(f"[{self.name}] Falling back to standard ClassicalAgent behavior")
             self.session = None
+
+    def _extract_json(self, text: str) -> dict:
+        """
+        Extract JSON from LLM response that may contain extra text.
+
+        Handles:
+        - JSON wrapped in markdown code blocks (```json ... ```)
+        - JSON followed by explanation text
+        - JSON preceded by explanation text
+
+        Args:
+            text: Raw LLM response text
+
+        Returns:
+            Parsed JSON as dictionary
+
+        Raises:
+            json.JSONDecodeError: If no valid JSON found
+        """
+        # Try to extract JSON from markdown code blocks first
+        code_block_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
+        if code_block_match:
+            return json.loads(code_block_match.group(1))
+
+        # Try to find JSON object by matching braces
+        brace_start = text.find('{')
+        if brace_start != -1:
+            # Find matching closing brace
+            depth = 0
+            for i, char in enumerate(text[brace_start:], brace_start):
+                if char == '{':
+                    depth += 1
+                elif char == '}':
+                    depth -= 1
+                    if depth == 0:
+                        json_str = text[brace_start:i + 1]
+                        return json.loads(json_str)
+
+        # Fallback: try parsing the whole string
+        return json.loads(text)
 
     def run_decorated_stage(
         self,
@@ -201,15 +254,15 @@ Focus on:
                 ],
                 strategy=RejectionSamplingStrategy(loop_budget=3)
             )
-            
-            # Parse the evaluation result
-            if isinstance(evaluation_result, str):
-                evaluation = json.loads(evaluation_result)
-            else:
-                evaluation = evaluation_result
-                
+
+            # Convert ModelOutputThunk or other lazy results to string
+            result_str = str(evaluation_result)
+
+            # Extract and parse JSON from LLM response (handles extra text)
+            evaluation = self._extract_json(result_str)
+
             return evaluation
-            
+
         except Exception as e:
             print(f"[{self.name}] Warning: Mellea evaluation failed: {e}")
             # Fallback to simple heuristic evaluation
@@ -261,15 +314,15 @@ Be specific and actionable. Focus on parameters that can be adjusted in the stag
                 ],
                 strategy=RejectionSamplingStrategy(loop_budget=3)
             )
-            
-            # Parse the adjustment result
-            if isinstance(adjustment_result, str):
-                adjustments = json.loads(adjustment_result)
-            else:
-                adjustments = adjustment_result
-                
+
+            # Convert ModelOutputThunk or other lazy results to string
+            result_str = str(adjustment_result)
+
+            # Extract and parse JSON from LLM response (handles extra text)
+            adjustments = self._extract_json(result_str)
+
             return adjustments
-            
+
         except Exception as e:
             print(f"[{self.name}] Warning: Mellea adjustment suggestion failed: {e}")
             return {

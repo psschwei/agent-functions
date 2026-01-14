@@ -78,6 +78,7 @@ def map_stage_node(state: PatternState) -> PatternState:
             agent = MelleaClassicalAgent(
                 name="MelleaClassicalAgent-Map",
                 model_backend=MELLEA_CONFIG.get("model_backend", "ollama"),
+                model_name=MELLEA_CONFIG.get("model_name", "llama2"),
                 max_retries=MELLEA_CONFIG.get("max_retries", 2)
             )
             print(f"[Workflow] Using Mellea-enhanced agent for map stage")

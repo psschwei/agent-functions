@@ -59,13 +59,15 @@ def test_mellea_agent_instantiation():
         agent = MelleaClassicalAgent(
             name="TestAgent",
             model_backend="ollama",
+            model_name="llama2",
             max_retries=1
         )
-        
+
         print("✓ MelleaClassicalAgent instantiated successfully")
         print(f"  Agent name: {agent.name}")
         print(f"  Max retries: {agent.max_retries}")
         print(f"  Model backend: {agent.model_backend}")
+        print(f"  Model name: {agent.model_name}")
         print(f"  Session initialized: {agent.session is not None}")
         
         return True
