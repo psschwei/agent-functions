@@ -54,7 +54,7 @@ MELLEA_CONFIG = {
     "enabled": False,  # Feature flag to enable Mellea agents
     "model_backend": "ollama",  # Backend: ollama, watsonx, huggingface, openai
     "max_retries": 2,  # Maximum adaptive retries per stage
-    "stages": ["map"],  # Which stages to use Mellea for (map, optimize, post_process)
+    "stages": ["map", "optimize", "post_process"],  # Which stages to use Mellea for
     "model_name": "granite4:tiny-h",  # Model name for the backend
     "temperature": 0.7,  # Temperature for LLM generation
     "evaluation_enabled": True,  # Enable result quality evaluation

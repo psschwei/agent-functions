@@ -128,17 +128,41 @@ def map_stage_node(state: PatternState) -> PatternState:
 
 def optimize_stage_node(state: PatternState) -> PatternState:
     """
-    Execute the optimize stage using ClassicalAgent.
+    Execute the optimize stage using ClassicalAgent or MelleaClassicalAgent.
 
     Transpiles/optimizes circuits for the target backend.
     Supports both decorated and script-based patterns.
+    Can use Mellea for adaptive execution if enabled in config.
     """
     print("\n" + "=" * 60)
     print("OPTIMIZE STAGE")
     print("=" * 60)
 
     pattern_name = state["pattern_name"]
-    agent = ClassicalAgent(name="ClassicalAgent-Optimize")
+
+    # Check if Mellea is enabled for optimize stage
+    from config import MELLEA_CONFIG
+    use_mellea = (
+        MELLEA_CONFIG.get("enabled", False) and
+        "optimize" in MELLEA_CONFIG.get("stages", [])
+    )
+
+    if use_mellea:
+        try:
+            from agents.mellea_classical_agent import MelleaClassicalAgent
+            agent = MelleaClassicalAgent(
+                name="MelleaClassicalAgent-Optimize",
+                model_backend=MELLEA_CONFIG.get("model_backend", "ollama"),
+                model_name=MELLEA_CONFIG.get("model_name", "llama2"),
+                max_retries=MELLEA_CONFIG.get("max_retries", 2)
+            )
+            print(f"[Workflow] Using Mellea-enhanced agent for optimize stage")
+        except ImportError as e:
+            print(f"[Workflow] Warning: Could not load MelleaClassicalAgent: {e}")
+            print(f"[Workflow] Falling back to standard ClassicalAgent")
+            agent = ClassicalAgent(name="ClassicalAgent-Optimize")
+    else:
+        agent = ClassicalAgent(name="ClassicalAgent-Optimize")
 
     # Update state
     state["current_stage"] = "optimize"
@@ -232,17 +256,41 @@ def execute_stage_node(state: PatternState) -> PatternState:
 
 def post_process_stage_node(state: PatternState) -> PatternState:
     """
-    Execute the post-process stage using ClassicalAgent.
+    Execute the post-process stage using ClassicalAgent or MelleaClassicalAgent.
 
     Analyzes results and creates visualizations.
     Supports both decorated and script-based patterns.
+    Can use Mellea for adaptive execution if enabled in config.
     """
     print("\n" + "=" * 60)
     print("POST-PROCESS STAGE")
     print("=" * 60)
 
     pattern_name = state["pattern_name"]
-    agent = ClassicalAgent(name="ClassicalAgent-PostProcess")
+
+    # Check if Mellea is enabled for post_process stage
+    from config import MELLEA_CONFIG
+    use_mellea = (
+        MELLEA_CONFIG.get("enabled", False) and
+        "post_process" in MELLEA_CONFIG.get("stages", [])
+    )
+
+    if use_mellea:
+        try:
+            from agents.mellea_classical_agent import MelleaClassicalAgent
+            agent = MelleaClassicalAgent(
+                name="MelleaClassicalAgent-PostProcess",
+                model_backend=MELLEA_CONFIG.get("model_backend", "ollama"),
+                model_name=MELLEA_CONFIG.get("model_name", "llama2"),
+                max_retries=MELLEA_CONFIG.get("max_retries", 2)
+            )
+            print(f"[Workflow] Using Mellea-enhanced agent for post_process stage")
+        except ImportError as e:
+            print(f"[Workflow] Warning: Could not load MelleaClassicalAgent: {e}")
+            print(f"[Workflow] Falling back to standard ClassicalAgent")
+            agent = ClassicalAgent(name="ClassicalAgent-PostProcess")
+    else:
+        agent = ClassicalAgent(name="ClassicalAgent-PostProcess")
 
     # Update state
     state["current_stage"] = "post_process"
