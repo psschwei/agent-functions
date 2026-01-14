@@ -10,7 +10,7 @@ This project demonstrates a multi-agent architecture using LangGraph to coordina
 
 - **Decorator-Based Patterns**: Define complete patterns in a single Python file using `@map_stage`, `@optimize_stage`, `@execute_stage`, and `@post_process_stage` decorators
 - **Multi-Agent Orchestration**: LangGraph supervisor coordinating classical and quantum agents
-- **Agentic Mode**: LLM-powered orchestrator with autonomous decision-making (`--agentic` flag)
+- **Agentic Mode**: LLM-powered orchestrator with autonomous decision-making (enabled by default, disable with `--no-agents`)
 - **Mellea Integration**: Adaptive execution with LLM-based result evaluation and parameter optimization
 - **Dual-Mode Support**: Automatic fallback between decorator-based and script-based patterns
 - **Type-Safe Context**: PatternContext provides typed I/O, logging, and config access
@@ -67,11 +67,11 @@ python main.py --pattern chsh --no-ray
 # Use Mellea-enhanced classical agent with adaptive execution
 python main.py --pattern chsh --mellea
 
-# Use agentic orchestrator with LLM reasoning
-python main.py --pattern chsh --agentic
+# Disable agentic orchestrator (use basic orchestrator instead)
+python main.py --pattern chsh --no-agents
 
-# Combine Mellea with agentic orchestrator for maximum adaptability
-python main.py --pattern chsh --mellea --agentic
+# Combine Mellea with agentic orchestrator (default behavior)
+python main.py --pattern chsh --mellea
 ```
 
 ## Project Structure
@@ -303,10 +303,14 @@ The workflow state tracks:
 
 ### Agentic Orchestrator
 
-The `--agentic` flag enables an LLM-powered orchestrator that provides autonomous decision-making:
+The agentic orchestrator is **enabled by default** and provides LLM-powered autonomous decision-making. To disable it and use the basic orchestrator instead, use the `--no-agents` flag:
 
 ```bash
-python main.py --pattern chsh --agentic
+# Run with agentic orchestrator (default)
+python main.py --pattern chsh
+
+# Run with basic orchestrator (disable agentic mode)
+python main.py --pattern chsh --no-agents
 ```
 
 **Capabilities:**
@@ -332,7 +336,7 @@ LLM_CONFIG = {
 }
 
 ORCHESTRATOR_CONFIG = {
-    "enable_llm": False,  # Enable LLM reasoning
+    "enable_llm": True,  # Enable LLM reasoning (default: True)
     "enable_retries": True,  # Allow stage retries on poor results
     "max_stage_retries": 2,  # Maximum retries per stage
     "max_workflow_iterations": 3,  # Maximum workflow iterations

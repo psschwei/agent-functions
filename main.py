@@ -27,11 +27,11 @@ Examples:
   # Run with Mellea-enhanced adaptive execution
   python main.py --pattern chsh --mellea
 
-  # Run with agentic orchestrator (LLM reasoning)
-  python main.py --pattern chsh --agentic
+  # Run with basic orchestrator (disable agentic mode)
+  python main.py --pattern chsh --no-agents
 
-  # Combine Mellea with agentic orchestrator
-  python main.py --pattern chsh --mellea --agentic
+  # Combine Mellea with agentic orchestrator (default)
+  python main.py --pattern chsh --mellea
 
   # Run with workflow visualization
   python main.py --pattern chsh --visualize
@@ -69,9 +69,9 @@ Examples:
     )
 
     parser.add_argument(
-        "--agentic",
+        "--no-agents",
         action="store_true",
-        help="Use agentic orchestrator with LLM reasoning (default: basic orchestrator)"
+        help="Disable agentic orchestrator and use basic orchestrator instead"
     )
 
     parser.add_argument(
@@ -185,13 +185,13 @@ def main():
             print(f"  Max retries: {MELLEA_CONFIG.get('max_retries', 2)}")
         
         # Create orchestrator
-        orchestrator_type = "Agentic" if args.agentic else "Basic"
+        orchestrator_type = "Basic" if args.no_agents else "Agentic"
         print_section(f"Creating {orchestrator_type} Orchestrator for '{args.pattern}' Pattern")
 
-        if args.agentic:
-            orchestrator = AgenticOrchestrator(pattern_name=args.pattern, enable_llm=True)
-        else:
+        if args.no_agents:
             orchestrator = Orchestrator(pattern_name=args.pattern)
+        else:
+            orchestrator = AgenticOrchestrator(pattern_name=args.pattern, enable_llm=True)
 
         print(f"  {orchestrator_type} Orchestrator created")
 
