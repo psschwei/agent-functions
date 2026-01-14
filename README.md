@@ -64,8 +64,14 @@ python main.py --pattern chsh --save-diagram workflow.md
 # Run without Ray cluster (for debugging)
 python main.py --pattern chsh --no-ray
 
+# Use Mellea-enhanced classical agent with adaptive execution
+python main.py --pattern chsh --mellea
+
 # Use agentic orchestrator with LLM reasoning
 python main.py --pattern chsh --agentic
+
+# Combine Mellea with agentic orchestrator for maximum adaptability
+python main.py --pattern chsh --mellea --agentic
 ```
 
 ## Project Structure
