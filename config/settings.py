@@ -23,11 +23,11 @@ QISKIT_CONFIG = {
     "seed_simulator": 42,
 }
 
-# LLM configuration for orchestrator
+# LLM configuration for orchestrator (uses Ollama by default for consistency with Mellea)
 LLM_CONFIG = {
-    "model": "gpt-4",  # Model name for OpenAI-compatible endpoint
-    "base_url": None,  # Set to litellm proxy URL, e.g., "http://localhost:4000"
-    "api_key": None,  # Falls back to OPENAI_API_KEY env var
+    "model": "granite4:tiny-h",  # Model name (matches MELLEA_CONFIG)
+    "base_url": "http://localhost:11434/v1",  # Ollama's OpenAI-compatible endpoint
+    "api_key": "ollama",  # Ollama doesn't require a real key
     "temperature": 0.7,
     "max_tokens": 2000,
     "timeout": 30,  # Request timeout in seconds
@@ -55,7 +55,7 @@ MELLEA_CONFIG = {
     "model_backend": "ollama",  # Backend: ollama, watsonx, huggingface, openai
     "max_retries": 2,  # Maximum adaptive retries per stage
     "stages": ["map"],  # Which stages to use Mellea for (map, optimize, post_process)
-    "model_name": "llama2",  # Model name for the backend
+    "model_name": "granite4:tiny-h",  # Model name for the backend
     "temperature": 0.7,  # Temperature for LLM generation
     "evaluation_enabled": True,  # Enable result quality evaluation
     "adjustment_enabled": True,  # Enable parameter adjustment suggestions
